@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import datetime
 import enum
-from typing import Any
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -27,7 +26,8 @@ class DimensionScore(BaseModel):
         ..., ge=0.0, le=1.0, description="Confidence level of the score in [0, 1]"
     )
     evidence: list[str] = Field(
-        default_factory=list, description="Human-readable evidence items supporting the score"
+        default_factory=list,
+        description="Human-readable evidence items supporting the score",
     )
 
 
@@ -53,12 +53,18 @@ class TrustWeights(BaseModel):
 
     @model_validator(mode="after")
     def weights_sum_to_one(self) -> TrustWeights:
-        """Reject weight configurations that don't sum to 1.0 (±0.001 tolerance)."""
+        """Reject weight configurations that don't sum to 1.0 (±1e-9 tolerance).
+
+        The tolerance of 1e-9 accommodates floating-point representation errors
+        (e.g. 0.1 + 0.2 != 0.3 in IEEE 754) while still rejecting weight sets
+        like (0.2503, 0.2503, 0.2503, 0.2503) that would allow the overall score
+        to exceed 1.0 before clamping when all dimension scores are 1.0.
+        """
         total = self.provenance + self.behavior + self.capability + self.security
-        if abs(total - 1.0) > 0.001:
+        if abs(total - 1.0) > 1e-9:
             raise ValueError(
-                f"TrustWeights must sum to 1.0, but sum is {total:.4f}. "
-                f"Adjust weights so provenance + behavior + capability + security = 1.0."
+                f"TrustWeights must sum to 1.0, but sum is {total:.10f}. "
+                "Adjust weights so provenance + behavior + capability + security = 1.0."
             )
         return self
 
@@ -77,17 +83,22 @@ class TrustScore(BaseModel):
     """Aggregated trust score for one agent at one point in time."""
 
     agent_id: str = Field(..., description="Unique identifier of the scored agent")
-    overall_score: float = Field(..., ge=0.0, le=1.0, description="Weighted overall score in [0, 1]")
+    overall_score: float = Field(
+        ..., ge=0.0, le=1.0, description="Weighted overall score in [0, 1]"
+    )
     dimension_scores: dict[str, DimensionScore] = Field(
         default_factory=dict,
         description="Dimension name -> DimensionScore mapping",
     )
     timestamp: datetime.datetime = Field(
-        default_factory=lambda: datetime.datetime.now(datetime.timezone.utc)
+        default_factory=lambda: datetime.datetime.now(datetime.UTC)
     )
 
     def grade(self) -> str:
-        """Return a letter grade: A (>=0.85), B (>=0.70), C (>=0.55), D (>=0.40), F (<0.40)."""
+        """Return a letter grade.
+
+        A (>=0.85), B (>=0.70), C (>=0.55), D (>=0.40), F (<0.40).
+        """
         if self.overall_score >= 0.85:
             return "A"
         if self.overall_score >= 0.70:
@@ -97,6 +108,19 @@ class TrustScore(BaseModel):
         if self.overall_score >= 0.40:
             return "D"
         return "F"
+
+    def __repr__(self) -> str:
+        """Return a compact, human-readable representation.
+
+        Example::
+
+            TrustScore(agent_id='agent-42', overall_score=0.8750, grade='A')
+        """
+        return (
+            f"TrustScore(agent_id={self.agent_id!r}, "
+            f"overall_score={self.overall_score:.4f}, "
+            f"grade={self.grade()!r})"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -114,7 +138,9 @@ class ProvenanceEvidence(BaseModel):
     model_card_present: bool = Field(default=False)
     license_verified: bool = Field(default=False)
     author_verified: bool = Field(default=False)
-    source_url: str | None = Field(default=None, description="URL to agent source/model card")
+    source_url: str | None = Field(
+        default=None, description="URL to agent source/model card"
+    )
 
 
 class BehaviorEvidence(BaseModel):
@@ -158,13 +184,15 @@ class CapabilityEvidence(BaseModel):
     verified_capabilities: list[str] = Field(default_factory=list)
     verification_method: str = Field(
         default="",
-        description="How capabilities were verified, e.g. 'benchmark_suite', 'manual_review'",
+        description=(
+            "How capabilities were verified, e.g. 'benchmark_suite', 'manual_review'"
+        ),
     )
 
     @field_validator("verified_capabilities")
     @classmethod
     def verified_must_be_subset_of_claimed(cls, verified: list[str]) -> list[str]:
-        """Warn-only: verified list may include items not in claimed (cross-validation)."""
+        """Warn-only: verified may include items not in claimed (cross-validation)."""
         return verified
 
 

@@ -146,13 +146,15 @@ class TrustScorer:
         # Reliability sub-score.
         reliability = _clamp(1.0 - evidence.error_rate)
         evidence_items.append(
-            f"Error rate {evidence.error_rate:.1%} -> reliability={reliability:.3f} (weight 0.40)"
+            f"Error rate {evidence.error_rate:.1%} "
+            f"-> reliability={reliability:.3f} (weight 0.40)"
         )
 
         # Uptime sub-score.
         uptime_score = _clamp(evidence.uptime_pct / 100.0)
         evidence_items.append(
-            f"Uptime {evidence.uptime_pct:.2f}% -> uptime_score={uptime_score:.3f} (weight 0.35)"
+            f"Uptime {evidence.uptime_pct:.2f}% "
+            f"-> uptime_score={uptime_score:.3f} (weight 0.35)"
         )
 
         # Latency sub-score: linear decay from good (500 ms) to poor (5000 ms).
@@ -174,7 +176,9 @@ class TrustScorer:
         score = _clamp(raw_score)
 
         # Confidence: log-scaled with sample count, capped at 1.0.
-        confidence = _sample_confidence(evidence.sample_count, _MIN_SAMPLES_FOR_FULL_CONFIDENCE)
+        confidence = _sample_confidence(
+            evidence.sample_count, _MIN_SAMPLES_FOR_FULL_CONFIDENCE
+        )
         evidence_items.append(
             f"Sample count {evidence.sample_count} -> confidence={confidence:.3f}"
         )
@@ -223,7 +227,11 @@ class TrustScorer:
 
         # Verification method bonus.
         method = evidence.verification_method.lower().strip()
-        structured_methods = {"benchmark_suite", "automated_eval", "automated_benchmark"}
+        structured_methods = {
+            "benchmark_suite",
+            "automated_eval",
+            "automated_benchmark",
+        }
         partial_methods = {"manual_review", "manual"}
         if method in structured_methods:
             method_bonus = 1.0
@@ -293,11 +301,14 @@ class TrustScorer:
                 high=float(_AUDIT_MAX_DAYS),
             )
             evidence_items.append(
-                f"Last audit {age_days} days ago -> audit_score={audit_score:.3f} (weight 0.30)"
+                f"Last audit {age_days} days ago "
+                f"-> audit_score={audit_score:.3f} (weight 0.30)"
             )
         else:
             audit_score = 0.0
-            evidence_items.append("No audit date recorded -> audit_score=0.0 (weight 0.30)")
+            evidence_items.append(
+                "No audit date recorded -> audit_score=0.0 (weight 0.30)"
+            )
 
         raw_score = sandbox_score * 0.35 + vuln_score * 0.35 + audit_score * 0.30
         score = _clamp(raw_score)
@@ -324,7 +335,8 @@ class TrustScorer:
         """Combine four dimension scores into a single :class:`TrustScore`.
 
         The overall score is the confidence-weighted sum of dimension scores,
-        then re-weighted by the configured :class:`~aumai_trustforge.models.TrustWeights`.
+        then re-weighted by the configured
+        :class:`~aumai_trustforge.models.TrustWeights`.
 
         Each dimension's contribution = ``weight * dimension_score * confidence``,
         normalized by the total effective weight (sum of ``weight * confidence``
@@ -365,7 +377,7 @@ class TrustScorer:
             agent_id=agent_id,
             overall_score=round(overall, 4),
             dimension_scores=dimension_scores_map,
-            timestamp=datetime.datetime.now(datetime.timezone.utc),
+            timestamp=datetime.datetime.now(datetime.UTC),
         )
 
 

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import datetime
 import json
 import sys
 from pathlib import Path
@@ -176,7 +175,9 @@ def _load_weights(weights_file: str | None) -> TrustWeights:
         return TrustWeights.model_validate(data)
     except Exception as exc:
         click.echo(
-            click.style(f"invalid weights file: {exc}; using equal weights", fg="yellow"),
+            click.style(
+                f"invalid weights file: {exc}; using equal weights", fg="yellow"
+            ),
             err=True,
         )
         return TrustWeights()
@@ -217,14 +218,16 @@ def _print_trust_report(trust: TrustScore) -> None:
 
     click.echo()
     click.echo(click.style("=" * 62, fg="cyan"))
-    click.echo(click.style("  AumAI TrustForge — Agent Trust Report", fg="cyan", bold=True))
+    click.echo(
+        click.style("  AumAI TrustForge — Agent Trust Report", fg="cyan", bold=True)
+    )
     click.echo(click.style("=" * 62, fg="cyan"))
     click.echo(f"  Agent ID   : {trust.agent_id}")
     click.echo(f"  Timestamp  : {trust.timestamp.isoformat()}")
-    click.echo(
-        f"  Overall    : "
-        + click.style(f"{trust.overall_score:.4f}  (Grade: {grade})", fg=grade_color, bold=True)
+    overall_styled = click.style(
+        f"{trust.overall_score:.4f}  (Grade: {grade})", fg=grade_color, bold=True
     )
+    click.echo("  Overall    : " + overall_styled)
     click.echo(click.style("-" * 62, fg="cyan"))
     click.echo("  Dimension Scores:")
     click.echo()
@@ -235,10 +238,11 @@ def _print_trust_report(trust: TrustScore) -> None:
         if dim_score is None:
             continue
         bar = _score_bar(dim_score.score)
-        click.echo(
-            f"  {dim_name.upper():12s}  {dim_score.score:.4f}  conf={dim_score.confidence:.2f}  "
-            + click.style(bar, fg=_score_color(dim_score.score))
+        prefix = (
+            f"  {dim_name.upper():12s}  {dim_score.score:.4f}"
+            f"  conf={dim_score.confidence:.2f}  "
         )
+        click.echo(prefix + click.style(bar, fg=_score_color(dim_score.score)))
         for item in dim_score.evidence:
             click.echo(f"              {click.style('* ' + item, fg='bright_black')}")
         click.echo()
